@@ -1,0 +1,10 @@
+# Module: aws
+# Docs: https://www.elastic.co/guide/en/beats/metricbeat/main/metricbeat-module-aws.html
+
+- module: aws
+  period: 24h
+  metricsets:
+    - awshealth
+
+  regions:
+    - us-east-1

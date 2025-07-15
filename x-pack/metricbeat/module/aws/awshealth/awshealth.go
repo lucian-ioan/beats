@@ -7,12 +7,14 @@ package awshealth
 import (
 	"context"
 	"crypto/fips140"
+	"errors"
 	"fmt"
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/health"
 	"github.com/aws/aws-sdk-go-v2/service/health/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/elastic/beats/v7/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/v7/metricbeat/mb"
@@ -149,6 +151,7 @@ func (m *MetricSet) getEventDetails(
 ) []mb.Event {
 	// Define event filter to fetch only upcoming and open events
 	eventFilter := types.EventFilter{
+		Regions: m.RegionsList,
 		EventStatusCodes: []types.EventStatusCode{
 			types.EventStatusCodeUpcoming,
 			types.EventStatusCodeOpen,
@@ -200,7 +203,14 @@ func (m *MetricSet) getEventDetails(
 		// Perform actions for the current page
 		currentPage, err := dePage.NextPage(ctx)
 		if err != nil {
-			m.Logger().Errorf("[AWS Health] DescribeEvents failed with : %w", err)
+			var opErr *smithy.OperationError
+			if errors.As(err, &opErr) {
+				// Log detailed AWS operation error
+				m.Logger().Errorf("[AWS Health] DescribeEvent API error: Operation=%s, Service=%s, Error=%v",
+					opErr.Operation(), opErr.Service(), opErr.Err)
+			} else {
+				m.Logger().Errorf("[AWS Health] DescribeEvent failed: %v", err)
+			}
 			break
 		}
 		deEvents = currentPage.Events
@@ -227,7 +237,14 @@ func (m *MetricSet) getEventDetails(
 			Locale:    &locale,
 		})
 		if err != nil {
-			m.Logger().Errorf("[AWS Health] DescribeEventDetails failed with : %w", err)
+			var opErr *smithy.OperationError
+			if errors.As(err, &opErr) {
+				// Log detailed AWS operation error
+				m.Logger().Errorf("[AWS Health] DescribeEventDetails API error: Operation=%s, Service=%s, Error=%v",
+					opErr.Operation(), opErr.Service(), opErr.Err)
+			} else {
+				m.Logger().Errorf("[AWS Health] DescribeEventDetails failed: %v", err)
+			}
 			break
 		}
 		// Fetch event description for the current page of events
